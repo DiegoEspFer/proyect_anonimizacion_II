@@ -1,0 +1,25 @@
+# Excluir modelo local por su tamaño (pesos de HuggingFace)
+modelo_local/
+
+# Archivos de logs y errores
+*.log
+error.log
+
+# Archivos de prueba locales
+scratch_*.py
+
+# Archivos de salida de anonimización para evitar subir datos de pacientes
+*_anonimizada.txt
+*_anonimizada.md
+
+# Carpetas de datos locales si existen
+dataset/
+__pycache__/
+.ipynb_checkpoints/
+
+.venv/
+venv/
+__pycache__/
+*.json
+*.pt
+*.bin
