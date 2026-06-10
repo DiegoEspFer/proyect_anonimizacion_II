@@ -166,7 +166,6 @@ class ClinicalAnonymizer:
         """
         placeholder = "<NOMBRE_PERSONAL_SANITARIO>"
 
-        # Patrón: Dr./Dra. + Apellido(s)
         patron_doctor = re.compile(
             r'\b(Dra?\.\s+)'
             r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+'
@@ -175,7 +174,6 @@ class ClinicalAnonymizer:
             re.UNICODE
         )
 
-        # Patrón MAYÚSCULAS: DR./DRA. + APELLIDO
         patron_doctor_upper = re.compile(
             r'\b(DRA?\.\s+)'
             r'([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})?)',
@@ -184,7 +182,6 @@ class ClinicalAnonymizer:
 
         def reemplazar(match):
             texto_completo = match.group(0)
-            # No tocar si ya tiene un placeholder
             if '<' in texto_completo and '>' in texto_completo:
                 return texto_completo
             prefijo = match.group(1)
@@ -195,8 +192,33 @@ class ClinicalAnonymizer:
 
         return texto_anonimizado
 
+    def _limpiar_fragmentos_residuales(self, texto: str) -> str:
+        """
+        Limpia fragmentos de texto pegados directamente a los placeholders.
+
+        Resuelve casos como:
+          <NOMBRE_PERSONAL_SANITARIO>GAUTA  →  <NOMBRE_PERSONAL_SANITARIO>
+          JAIV<NOMBRE_PERSONAL_SANITARIO>   →  <NOMBRE_PERSONAL_SANITARIO>
+          <FECHAS>:09                       →  <FECHAS>
+        """
+        # Fragmentos DESPUÉS del tag: <TAG>texto_pegado → <TAG>
+        texto = re.sub(
+            r'(<[A-Z_]+>)([A-ZÁÉÍÓÚÑa-záéíóúñ0-9:/.]+)',
+            r'\1',
+            texto
+        )
+
+        # Fragmentos ANTES del tag: texto_pegado<TAG> → <TAG>
+        texto = re.sub(
+            r'([A-ZÁÉÍÓÚÑa-záéíóúñ]+)(<[A-Z_]+>)',
+            r'\2',
+            texto
+        )
+
+        return texto
+
     def anonymize(self, text, placeholder_format="<{label}>"):
-        """Anonimiza texto: NER + expansión + patrones médicos."""
+        """Anonimiza texto: NER + expansión + patrones + limpieza de residuos."""
         if not isinstance(text, str) or not text.strip():
             return text
 
@@ -222,8 +244,12 @@ class ClinicalAnonymizer:
             fragments.append(text[last_idx:])
             resultado = "".join(fragments)
 
-        # Post-procesamiento basado en patrones
+        # Post-procesamiento: patrones Dr./Dra.
         resultado = self._postprocesar_patrones_medicos(resultado)
+
+        # Post-procesamiento: limpiar fragmentos residuales pegados a tags
+        resultado = self._limpiar_fragmentos_residuales(resultado)
+
         return resultado
 
     def anonymize_file(self, filepath):
