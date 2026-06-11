@@ -1,0 +1,135 @@
+================================================================================
+  MANUAL DE ACTUALIZACIÓN Y PUESTA EN MARCHA
+  Sistema Anonimizador PII - HIC
+================================================================================
+
+DESCRIPCIÓN
+-----------
+Sistema web para anonimizar documentos clínicos en español (PDF y TXT).
+Detecta y reemplaza información de identificación personal (PII) usando un
+modelo de inteligencia artificial especializado en texto médico.
+
+Repositorio:
+https://github.com/DiegoEspFer/proyect_anonimizacion_II.git
+
+
+REQUISITOS PREVIOS
+------------------
+- Python 3.10 o superior
+- pip (gestor de paquetes de Python)
+- Conexión a internet (solo para el paso de descarga del modelo)
+- Espacio en disco: mínimo 2 GB libres (el modelo ocupa ~500 MB)
+
+
+PASO 1 - CLONAR EL REPOSITORIO
+-------------------------------
+Abrir una terminal y ejecutar:
+
+    git clone https://github.com/DiegoEspFer/proyect_anonimizacion_II.git
+    cd proyect_anonimizacion_II
+
+Si ya tienes el repositorio clonado y quieres actualizar a la última versión:
+
+    git pull origin main
+
+
+PASO 2 - CREAR Y ACTIVAR ENTORNO VIRTUAL (recomendado)
+-------------------------------------------------------
+En Windows:
+
+    python -m venv venv
+    venv\Scripts\activate
+
+En Linux / macOS:
+
+    python -m venv venv
+    source venv/bin/activate
+
+El prompt de la terminal debería mostrar (venv) al inicio.
+
+
+PASO 3 - INSTALAR DEPENDENCIAS
+--------------------------------
+Con el entorno virtual activado:
+
+    pip install -r requirements.txt
+
+Esto instala:
+  - streamlit       (interfaz web)
+  - torch           (motor de IA)
+  - transformers    (modelos de HuggingFace)
+  - pdfplumber      (lectura de PDFs)
+  - fpdf2           (generación de PDFs)
+  - markitdown      (conversión de documentos)
+
+NOTA: La instalación de torch puede tardar varios minutos dependiendo
+      de la conexión a internet.
+
+
+PASO 4 - DESCARGAR EL MODELO DE IA (solo la primera vez)
+----------------------------------------------------------
+Este paso descarga el modelo RoBERTa entrenado en documentos clínicos
+en español desde HuggingFace (~500 MB). Solo se hace UNA VEZ.
+
+    python download_model.py
+
+El modelo quedará guardado en la carpeta:  ./modelo_local/
+
+Si la carpeta modelo_local/ ya existe y contiene archivos, este paso
+puede omitirse.
+
+Archivos que deben estar en modelo_local/ después de la descarga:
+  - config.json
+  - model.safetensors  (o pytorch_model.bin)
+  - tokenizer.json
+  - tokenizer_config.json
+
+
+PASO 5 - EJECUTAR LA APLICACIÓN
+---------------------------------
+Con el entorno virtual activado:
+
+    streamlit run app.py
+
+Por defecto la aplicación se abre en:  http://localhost:8501
+
+Para cambiar el puerto (por ejemplo 9005):
+
+    streamlit run app.py --server.port 9005
+
+Para que sea accesible desde otras máquinas en la red:
+
+    streamlit run app.py --server.port 9005 --server.address 0.0.0.0
+
+
+ESTRUCTURA DE ARCHIVOS DEL PROYECTO
+--------------------------------------
+proyect_anonimizacion_II/
+  app.py              -> Interfaz web (Streamlit)
+  converter.py        -> Extracción de texto desde PDFs
+  model_roberta.py    -> Modelo NER y lógica de anonimización
+  download_model.py   -> Descarga el modelo desde HuggingFace
+  requirements.txt    -> Dependencias de Python
+  LOGO-HIC.png        -> Logo mostrado en la interfaz
+  modelo_local/       -> Carpeta generada al ejecutar download_model.py
+                         (NO está en el repositorio, se crea localmente)
+  dataset_anonimizado/-> Carpeta donde se pueden guardar resultados
+                         (NO está en el repositorio)
+
+
+RESUMEN RÁPIDO (para actualizaciones posteriores)
+--------------------------------------------------
+1. git pull origin main
+2. pip install -r requirements.txt    (si hay cambios en dependencias)
+3. streamlit run app.py
+
+
+NOTAS IMPORTANTES
+-----------------
+- La carpeta modelo_local/ NO se sube al repositorio. Cada vez que se
+  clone en una máquina nueva hay que ejecutar download_model.py.
+- La primera carga del modelo en la interfaz puede tardar ~30-60 segundos.
+- El sistema procesa documentos en español únicamente.
+- Formatos soportados: PDF y TXT.
+
+================================================================================
