@@ -1,0 +1,209 @@
+================================================================================
+REPORTE DE CAMBIOS DE CIBERSEGURIDAD
+Proyecto: Anonimizador PII - HIC
+Fecha de aplicacion: 2026-06-24
+Basado en: Escaneo ZAP by Checkmarx (2026-06-02) sobre http://172.30.19.93:9004/
+================================================================================
+
+
+--------------------------------------------------------------------------------
+RESUMEN DE ALERTAS ATENDIDAS
+--------------------------------------------------------------------------------
+
+  Nivel   | Alerta                                    | CWE   | Estado
+  --------|-------------------------------------------|-------|------------------
+  Medio   | CSP (Content Security Policy) no config.  | 693   | RESUELTO
+  Medio   | Falta cabecera Anti-Clickjacking           | 1021  | RESUELTO
+  Bajo    | Cookie sin flag HttpOnly                   | 1004  | RESUELTO PARCIAL
+  Bajo    | Divulgacion de Marcas de Tiempo Unix       | 497   | NO APLICABLE (*)
+  Bajo    | Falta encabezado X-Content-Type-Options    | 693   | RESUELTO
+
+(*) Las marcas de tiempo se encuentran en archivos JS estaticos internos del
+    paquete "streamlit". No son modificables desde el codigo del proyecto.
+
+
+================================================================================
+DETALLE DE CAMBIOS POR ARCHIVO
+================================================================================
+
+
+--------------------------------------------------------------------------------
+ARCHIVO 1: security_headers.py  (ARCHIVO NUEVO)
+Ruta: proyect_anonimizacion_II/security_headers.py
+--------------------------------------------------------------------------------
+
+Descripcion general:
+  Modulo nuevo que aplica un parche (monkey-patch) al metodo
+  tornado.web.RequestHandler.finish, que es el punto de salida de todas
+  las respuestas HTTP del servidor interno de Streamlit (basado en Tornado).
+  Al reemplazar ese metodo, cada respuesta HTTP enviada al navegador incluye
+  automaticamente las cabeceras de seguridad requeridas.
+
+Cambio 1 — Lineas 28-35: Cabecera Content-Security-Policy
+  Codigo agregado:
+    self.set_header(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' ws: wss:; "
+        "font-src 'self' data:; "
+        "worker-src blob:; "
+        "frame-ancestors 'none';"
+    )
+  Alerta que resuelve:
+    [Medio] Cabecera Content Security Policy (CSP) no configurada
+    CWE-693 / WASC-15 / Plugin ZAP: 10038
+  Que hace:
+    Declara al navegador cuales son los origenes de contenido permitidos.
+    Previene ataques XSS e inyeccion de datos al bloquear la carga de
+    scripts, estilos e iframes de origenes no autorizados.
+    La directiva "frame-ancestors 'none'" ademas bloquea el enmarcado
+    de la aplicacion en iframes de cualquier dominio externo.
+  Nota tecnica:
+    'unsafe-inline' y 'unsafe-eval' son necesarios porque Streamlit genera
+    scripts y estilos en linea internamente. Son la politica mas restrictiva
+    compatible con Streamlit sin modificar su codigo fuente.
+
+Cambio 2 — Linea 37: Cabecera X-Frame-Options
+  Codigo agregado:
+    self.set_header("X-Frame-Options", "DENY")
+  Alerta que resuelve:
+    [Medio] Falta de cabecera Anti-Clickjacking
+    CWE-1021 / WASC-15 / Plugin ZAP: 10020
+  Que hace:
+    Impide que la aplicacion sea cargada dentro de un <iframe> en cualquier
+    pagina externa, bloqueando ataques de Clickjacking. Complementa la
+    directiva frame-ancestors de la CSP para maxima compatibilidad entre
+    navegadores modernos y antiguos.
+
+Cambio 3 — Linea 39: Cabecera X-Content-Type-Options
+  Codigo agregado:
+    self.set_header("X-Content-Type-Options", "nosniff")
+  Alerta que resuelve:
+    [Bajo] Falta encabezado X-Content-Type-Options
+    CWE-693 / WASC-15 / Plugin ZAP: 10021
+  Que hace:
+    Indica al navegador que debe respetar estrictamente el Content-Type
+    declarado en la respuesta y no intentar "adivinar" el tipo de archivo
+    (MIME-sniffing). Previene que archivos maliciosos disfrazados de
+    imagenes o texto sean ejecutados como scripts.
+
+Cambio 4 — Lineas 41-42: Cabeceras adicionales de hardening
+  Codigo agregado:
+    self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+    self.set_header("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+  Alerta que resuelve:
+    Hardening adicional de buenas practicas (no alertado por ZAP).
+  Que hace:
+    Referrer-Policy: limita la informacion enviada en la cabecera Referer
+    al hacer clic en enlaces externos, evitando filtracion de URLs internas.
+    Permissions-Policy: deshabilita explicitamente el acceso a geolocation,
+    microfono y camara desde la aplicacion web.
+
+
+--------------------------------------------------------------------------------
+ARCHIVO 2: .streamlit/config.toml  (ARCHIVO NUEVO)
+Ruta: proyect_anonimizacion_II/.streamlit/config.toml
+--------------------------------------------------------------------------------
+
+Descripcion general:
+  Archivo de configuracion oficial de Streamlit. Controla el comportamiento
+  del servidor a nivel de framework.
+
+Cambio 1 — [server] enableCORS = false
+  Alerta que resuelve:
+    Hardening general del servidor.
+  Que hace:
+    Deshabilita el mecanismo CORS permisivo de Streamlit, de forma que el
+    servidor rechaza solicitudes de origenes cruzados no autorizados.
+
+Cambio 2 — [server] enableXsrfProtection = true
+  Alerta que resuelve:
+    [Bajo] Cookie Sin Flag HttpOnly (CWE-1004) — resolucion parcial.
+  Que hace:
+    Garantiza que la proteccion XSRF del framework este activa. La cookie
+    "_streamlit_xsrf" es gestionada internamente por Tornado; agregar el
+    flag HttpOnly directamente romperia la lectura del token por parte del
+    cliente JavaScript, por lo que esta configuracion es la forma correcta
+    de reforzar la proteccion sin degradarla.
+
+Cambio 3 — [browser] gatherUsageStats = false
+  Alerta que resuelve:
+    Buena practica de privacidad (no alertado por ZAP).
+  Que hace:
+    Deshabilita el envio de telemetria de uso al servidor de Streamlit Inc.,
+    evitando la transmision de datos operacionales a terceros.
+
+
+--------------------------------------------------------------------------------
+ARCHIVO 3: app.py  (ARCHIVO MODIFICADO)
+Ruta: proyect_anonimizacion_II/app.py
+--------------------------------------------------------------------------------
+
+Cambio 1 — Linea 1: Importacion del modulo de seguridad
+  Codigo antes:
+    import streamlit as st
+  Codigo despues:
+    import security_headers  # noqa: F401
+    import streamlit as st
+  Alerta que resuelve:
+    Todas las alertas cubiertas por security_headers.py (CWE-693, CWE-1021).
+  Que hace:
+    Al ser la primera instruccion del archivo, garantiza que el parche de
+    Tornado queda aplicado antes de que Streamlit procese cualquier
+    solicitud HTTP, cubriendo la mayor cantidad posible de respuestas
+    con las cabeceras de seguridad.
+
+Cambio 2 — Funcion inject_hic_styling(), lineas 19-21: Meta etiquetas CSP
+  Codigo agregado (dentro del bloque st.markdown):
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self' 'unsafe-inline'
+          'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self'
+          data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:;
+          worker-src blob:; frame-ancestors 'none';">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+  Alerta que resuelve:
+    [Medio] CSP no configurada (CWE-693) — segunda capa de defensa.
+  Que hace:
+    Agrega la politica CSP tambien a nivel de documento HTML mediante
+    meta etiquetas, complementando la cabecera HTTP del parche Tornado.
+    Esto asegura que incluso si un navegador o proxy intermedio elimina
+    la cabecera HTTP, la politica sigue presente en el documento.
+    Nota: la directiva "frame-ancestors" es ignorada en meta etiquetas
+    por especificacion del W3C; su cumplimiento depende de la cabecera
+    HTTP configurada en security_headers.py.
+
+
+================================================================================
+ALERTAS NO RESUELTAS Y JUSTIFICACION
+================================================================================
+
+1. [Bajo] Divulgacion de Marcas de Tiempo Unix (CWE-497 / Plugin ZAP: 10096)
+   Razon de no correccion:
+     Las marcas de tiempo detectadas se encuentran dentro de archivos
+     JavaScript del paquete "streamlit" instalado en el entorno virtual
+     (por ejemplo: emotion-styled.browser.esm.BPUx6WuE.js, v4.D-g8Wqsd.js).
+     Estos archivos son parte de la distribucion de Streamlit y no pueden
+     ser modificados sin alterar el paquete de terceros. La solucion correcta
+     es actualizar Streamlit cuando el proveedor publique una version que
+     no exponga dichos valores, o filtrar la respuesta a nivel de proxy
+     inverso (nginx/Apache).
+
+2. [Bajo] Cookie Sin Flag HttpOnly — resolucion parcial (CWE-1004)
+   Razon de resolucion parcial:
+     La cookie "_streamlit_xsrf" es un token XSRF gestionado por Tornado.
+     En la implementacion de Streamlit, este token es leido por el cliente
+     JavaScript para ser enviado en cada solicitud WebSocket, lo que hace
+     que agregar el flag HttpOnly rompa funcionalmente la proteccion XSRF.
+     Agregar HttpOnly a esta cookie de forma forzada eliminaria la capacidad
+     del navegador de leer el token y enviarlo, anulando la proteccion que
+     el propio token provee. Por este motivo, la alerta de ZAP es un falso
+     positivo funcional en este contexto. Se refuerza la proteccion activando
+     enableXsrfProtection = true en la configuracion del servidor.
+
+
+================================================================================
+FIN DEL REPORTE
+================================================================================

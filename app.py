@@ -1,3 +1,5 @@
+import security_headers  # noqa: F401 — aplica cabeceras HTTP de seguridad (ZAP CWE-693, CWE-1021)
+
 import streamlit as st
 import os
 import io
@@ -14,6 +16,9 @@ from fpdf import FPDF
 # ==========================================
 def inject_hic_styling() -> None:
     st.markdown("""
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:; worker-src blob:; frame-ancestors 'none';">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <style>
     .block-container { padding-top: 1.2rem !important; padding-bottom: 1rem !important; max-width: 50rem !important; }
     header { display: none !important; }

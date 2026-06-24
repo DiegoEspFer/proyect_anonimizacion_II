@@ -1,0 +1,12 @@
+# Configuración de seguridad del servidor Streamlit
+# Mitiga hallazgos del escaneo ZAP by Checkmarx (2026-06-02)
+
+[server]
+# Deshabilitar CORS permite que el servidor rechace solicitudes de orígenes cruzados no autorizados.
+enableCORS = false
+# Mantener protección XSRF activa (CWE-1004 relacionado con cookie _streamlit_xsrf).
+enableXsrfProtection = true
+
+[browser]
+# No enviar telemetría de uso a Streamlit Inc.
+gatherUsageStats = false

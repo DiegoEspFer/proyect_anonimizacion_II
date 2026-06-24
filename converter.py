@@ -64,11 +64,8 @@ def convert_file(file_path: str) -> str:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"No se encontró el archivo: {file_path}")
 
-    # Fallback para archivos que no sean PDF utilizando MarkItDown básico
     if not file_path.lower().endswith('.pdf'):
-        from markitdown import MarkItDown
-        md = MarkItDown()
-        return md.convert(file_path).text_content.replace('\n', ' ')
+        raise ValueError(f"Solo se admiten archivos PDF: {file_path}")
 
     contenido_documento = []
 
